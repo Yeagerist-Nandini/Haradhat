@@ -1,126 +1,102 @@
-const {
-  time,
-  loadFixture,
-} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
 const { expect } = require("chai");
 
-describe("Lock", function () {
-  // We define a fixture to reuse the same setup in every test.
-  // We use loadFixture to run this setup once, snapshot that state,
-  // and reset Hardhat Network to that snapshot in every test.
-  async function deployOneYearLockFixture() {
-    const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-    const ONE_GWEI = 1_000_000_000;
+// describe("Token contract", function () {
+  // it("Deployment should assign the total supply of tokens to the owner", async function () {
+  //   const [owner] = await ethers.getSigners();
 
-    const lockedAmount = ONE_GWEI;
-    const unlockTime = (await time.latest()) + ONE_YEAR_IN_SECS;
+  //   const Token = await ethers.getContractFactory("Token"); //instance contract
+  //   const hardhatToken=await Token.deploy();//deploy contract
 
-    // Contracts are deployed using the first signer/account by default
-    const [owner, otherAccount] = await ethers.getSigners();
+  //   const ownerBalance = await hardhatToken.balanceOf(owner.address);
+  //   expect(await hardhatToken.totalSupply()).to.equal(ownerBalance);
+  // });
 
-    const Lock = await ethers.getContractFactory("Lock");
-    const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+  // it("Should transfer tokens between accounts", async function () {
+  //   const [owner,add1,add2] = await ethers.getSigners();
 
-    return { lock, unlockTime, lockedAmount, owner, otherAccount };
-  }
+  //   const Token = await ethers.getContractFactory("Token");
+  //   const hardhatToken=await Token.deploy();
 
-  describe("Deployment", function () {
-    it("Should set the right unlockTime", async function () {
-      const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
+  //   await hardhatToken.transfer(add1.address,10);
+  //   expect(await hardhatToken.balanceOf(add1.address)).to.equal(10);
 
-      expect(await lock.unlockTime()).to.equal(unlockTime);
-    });
+  //   await hardhatToken.connect(add1).transfer(add2.address,5);
+  //   expect(await hardhatToken.balanceOf(add1.address)).to.equal(5);
+  // });
+// });
 
-    it("Should set the right owner", async function () {
-      const { lock, owner } = await loadFixture(deployOneYearLockFixture);
 
-      expect(await lock.owner()).to.equal(owner.address);
-    });
+// We can say that the sample constant is an object comprised of the following:
+// (1) contract's bytecode string
+// (2) contract's interface object
+// (3) signer object
 
-    it("Should receive and store the funds to lock", async function () {
-      const { lock, lockedAmount } = await loadFixture(
-        deployOneYearLockFixture
-      );
+// I think it's good to practice remembering them as written below:
+// getContractFactory("name of the contract") ==> { "bytecode" , {interface} , {signer}  }
 
-      expect(await ethers.provider.getBalance(lock.target)).to.equal(
-        lockedAmount
-      );
-    });
+// Then it's time to do as below if we want to deploy our contract:
+// const Sample = await sample.deploy()
+// await Sample.deployed()
 
-    it("Should fail if the unlockTime is not in the future", async function () {
-      // We don't use the fixture here because we want a different deployment
-      const latestTime = await time.latest();
-      const Lock = await ethers.getContractFactory("Lock");
-      await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-        "Unlock time should be in the future"
-      );
-    });
+
+
+describe("Token Contract",function(){
+  let Token;
+  let hardhatToken;
+  let owner;
+  let add1;
+  let add2;
+  let addrs;
+
+  beforeEach(async function () {
+    Token = await ethers.getContractFactory("Token");
+    [owner, add1, add2, ...addrs] = await ethers.getSigners();
+    hardhatToken = await Token.deploy();
   });
 
-  describe("Withdrawals", function () {
-    describe("Validations", function () {
-      it("Should revert with the right error if called too soon", async function () {
-        const { lock } = await loadFixture(deployOneYearLockFixture);
-
-        await expect(lock.withdraw()).to.be.revertedWith(
-          "You can't withdraw yet"
-        );
-      });
-
-      it("Should revert with the right error if called from another account", async function () {
-        const { lock, unlockTime, otherAccount } = await loadFixture(
-          deployOneYearLockFixture
-        );
-
-        // We can increase the time in Hardhat Network
-        await time.increaseTo(unlockTime);
-
-        // We use lock.connect() to send a transaction from another account
-        await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-          "You aren't the owner"
-        );
-      });
-
-      it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-        const { lock, unlockTime } = await loadFixture(
-          deployOneYearLockFixture
-        );
-
-        // Transactions are sent using the first signer by default
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).not.to.be.reverted;
-      });
+  describe("Deployment",function(){
+    it("Should set the right owner",async function(){
+      expect(await hardhatToken.owner()).to.equal(owner.address);
     });
 
-    describe("Events", function () {
-      it("Should emit an event on withdrawals", async function () {
-        const { lock, unlockTime, lockedAmount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+    it("Deployment should assign the total supply of tokens to the owner", async function () {
+      const ownerBalance = await hardhatToken.balanceOf(owner.address);
+      expect(await hardhatToken.totalSupply()).to.equal(ownerBalance);
+    });
+  })
+  
 
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw())
-          .to.emit(lock, "Withdrawal")
-          .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-      });
+  describe("Transaction",function(){
+    it("Should transfer tokens between accounts", async function () {
+      await hardhatToken.transfer(add1.address,10);
+      expect(await hardhatToken.balanceOf(add1.address)).to.equal(10);
+  
+      await hardhatToken.connect(add1).transfer(add2.address,5);
+      expect(await hardhatToken.balanceOf(add2.address)).to.equal(5);
     });
 
-    describe("Transfers", function () {
-      it("Should transfer the funds to the owner", async function () {
-        const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-          deployOneYearLockFixture
-        );
+    it("Should fail if sender does not have enough tokens",async function(){
+      const initialOwnerBalance=await hardhatToken.balanceOf(owner.address);
+      await expect(hardhatToken.connect(add1).transfer(owner.address,2)
+      ).to.be.revertedWith("Not enough tokens");
 
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).to.changeEtherBalances(
-          [owner, lock],
-          [lockedAmount, -lockedAmount]
-        );
-      });
+      expect(await hardhatToken.balanceOf(owner.address)).to.equal(initialOwnerBalance);
     });
-  });
-});
+
+    it("Should update balances after transfers",async function(){
+      const initialOwnerBalance=await hardhatToken.balanceOf(owner.address);
+      await hardhatToken.transfer(add1.address,10);
+      await hardhatToken.transfer(add2.address,5);
+
+      const finalOwnerBalance=await hardhatToken.balanceOf(owner.address);
+      expect(finalOwnerBalance).to.equal(initialOwnerBalance-BigInt('15'));
+
+      const addr1Balance = await hardhatToken.balanceOf(add1.address);
+      expect(addr1Balance).to.equal(10);
+      const addr2Balance = await hardhatToken.balanceOf(add2.address);
+      expect(addr2Balance).to.equal(5);
+    });
+  })
+
+})
+
